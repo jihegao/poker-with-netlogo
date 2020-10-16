@@ -653,10 +653,10 @@ ticks
 30.0
 
 BUTTON
-20
-89
-86
-122
+21
+126
+87
+159
 NIL
 setup
 NIL
@@ -686,9 +686,9 @@ HORIZONTAL
 
 BUTTON
 20
-129
+172
 152
-162
+205
 NIL
 play-one-round
 NIL
@@ -714,9 +714,9 @@ print-logs?
 
 SLIDER
 20
-48
+84
 112
-81
+117
 blind
 blind
 0
@@ -856,6 +856,21 @@ click 'play-one-around' will automatically run the following procedures. If you 
 11
 0.0
 1
+
+SLIDER
+20
+49
+192
+82
+player-money
+player-money
+0
+200
+100.0
+1
+1
+NIL
+HORIZONTAL
 
 @#$#@#$#@
 ## WHAT IS IT?
