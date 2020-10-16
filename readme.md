@@ -4,7 +4,7 @@
 
 A poker simulator. Wrote it just for fun.
 
-online version: https://github.com/jihegao/poker-with-netlogo/blob/main/poker.html
+online version: [https://github.com/jihegao/poker-with-netlogo/blob/main/poker.html][1]
 
 ## Functions 
 
@@ -21,3 +21,6 @@ online version: https://github.com/jihegao/poker-with-netlogo/blob/main/poker.ht
 ## Contact
 
 jihe.gao(at)gmail.com
+
+
+[1]: https://github.com/jihegao/poker-with-netlogo/blob/main/poker.html
