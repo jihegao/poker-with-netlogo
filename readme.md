@@ -4,6 +4,8 @@
 
 A poker simulator. Wrote it just for fun.
 
+online version: https://github.com/jihegao/poker-with-netlogo/blob/main/poker.html
+
 ## Functions 
 
 - deal the cards with pre-flop, flop, turn, river round
