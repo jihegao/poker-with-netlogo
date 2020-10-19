@@ -34,6 +34,7 @@ globals [
   current_round
   winners
   hand_rank
+  #_round
 ]
 
 to setup
@@ -84,7 +85,7 @@ to init-cards
   update-pot
 
   (foreach ["Club" "Diamond" "Heart" "Spade"] [ s ->
-    (foreach (range 12) [ n ->
+    (foreach (range 13) [ n ->
       crt 1 [
         set breed cards
         set heading 0
@@ -158,17 +159,17 @@ to-report compare-players-hands [player1 player2]
   let result ifelse-value (compare-hands hand1 hand2 = true) [
     "WIN"
   ][
-    ifelse-value (compare-hands hand2 hand1 = true) [
+;    ifelse-value (compare-hands hand2 hand1 = true) [
       "LOSS"
-    ][
-      "TIE"
-    ]
+;    ][
+;      "TIE"
+;    ]
   ]
 
   if print-logs? [
-    output-show (word player1 " hand: " hand1)
-    output-show (word player2 " hand: " hand2)
-    output-show result
+    output-print (word player1 " hand: " hand1)
+    output-print (word player2 " hand: " hand2)
+    output-print (word ifelse-value (result = "WIN") [player1][player2] "WIN")
   ]
   report result
 end
@@ -180,19 +181,19 @@ to-report compare-hands [hand1 hand2]
     report (position first hand1 hand_rank) > (position first hand2 hand_rank)
   ][; compare within same type, compare biggest card in descending order
     report ifelse-value ((first last hand1) != (first last hand2))[
-      (first last hand1) > (first last hand2)
+      is-bigger-than (first last hand1) (first last hand2)
     ][
       ifelse-value ((item 1 last hand1) != (item 1 last hand2))[
-        (item 1 last hand1) > (item 1 last hand2)
+        is-bigger-than (item 1 last hand1) (item 1 last hand2)
       ][
         ifelse-value ((item 2 last hand1) != (item 2 last hand2))[
-          (item 2 last hand1) > (item 2 last hand2)
+          is-bigger-than (item 2 last hand1) (item 2 last hand2)
         ][
           ifelse-value ((item 3 last hand1) != (item 3 last hand2))[
-            (item 3 last hand1) > (item 3 last hand2)
+            is-bigger-than (item 3 last hand1) (item 3 last hand2)
           ][
             ifelse-value ((item 4 last hand1) != (item 4 last hand2))[
-              (item 4 last hand1) > (item 4 last hand2)
+              is-bigger-than (item 4 last hand1) (item 4 last hand2)
             ][
               false
             ]
@@ -343,6 +344,7 @@ end
 
 
 to play-one-round
+  set #_round #_round + 1
   init-cards
   deal ;"pre-flop"
   bet-round
@@ -436,7 +438,7 @@ to bet-until-check-or-win
   let alive_player_seq filter [p -> [my_move] of p != "fold" and not [betted?] of p] player_seq
 
   while [ not current_betting_completed? ][
-    output-print (word "bet round " bet_round)
+    if print-logs? [ output-print (word "bet round " bet_round) ]
     ; at pre-flop round, small blind and big blind drop chips
     if current_round = "pre-flop" and bet_round = 0 [
       blind-bet
@@ -452,6 +454,7 @@ end
 
 
 to bet-round
+  ;tick
   set money_to_call 0
   ; init alive players status
   ask alive_players [
@@ -460,7 +463,7 @@ to bet-round
   ]
 
   ifelse has-winner? [
-    output-print "There is a winner, game stop."
+    if print-logs? [ output-print "There is a winner, game stop." ]
   ][
       ; this is the recursive betting round
     bet-until-check-or-win
@@ -472,28 +475,34 @@ to bet-round
 end
 
 
+to hands-rank
+  let playerRank sort-by [[p1 p2] -> compare-players-hands p1 p2 = "WIN"] alive_players
+  let p0 first playerRank
+  set winners (turtle-set winners p0)
+  if print-logs? [ output-print word "ADD WINNER " p0 ]
+  foreach but-first playerRank [ p ->
+    if compare-players-hands p p0 != "LOSS" [
+      set winners (turtle-set winners p)
+      if print-logs? [ output-print word "ADD WINNER " p ]
+    ]
+    set p0 p
+  ]
+  if print-logs? [ output-print (word "WINNERS: " ( sort winners)) ]
+end
+
 ; cannot deal with all-in for now
 to winner-collect-the-money
   if current_round = "the-river" [
-    let playerRank sort-by [[p1 p2] -> compare-players-hands p1 p2 = "WIN"] alive_players
-    let p0 first playerRank
-    set winners (turtle-set winners p0)
-    if print-logs? [ output-show word "ADD WINNER " p0 ]
-    foreach but-first playerRank [ p ->
-      if compare-players-hands p p0 != "LOSS" [
-        set winners (turtle-set winners p)
-        if print-logs? [ output-show word "ADD WINNER " p ]
-      ]
-      set p0 p
-    ]
+    hands-rank
   ]
-
-  if any? winners [
+  ifelse any? winners [
     let reward pot_money / count winners
     ask winners [
       set money money + reward
       update-player-status
     ]
+  ][
+
   ]
 
   set pot_money 0
@@ -547,6 +556,50 @@ to update-money-to-call
 ;    stop
 ;  ]
 end
+
+
+to-report contents-of [pole-cards]
+  let card1 first pole-cards
+  let card2 last pole-cards
+  report (list [list suit number] of card1 [list suit number] of card2)
+end
+
+
+;
+; MONTE-CARLO DEALING
+;
+; record the win/loss rate for each combination of pole cards
+;
+to batch-dealing [n_rounds]
+  if is-string? n_rounds [ set n_rounds read-from-string n_rounds]
+  let dic_cards []
+  let #_wins []
+  let #_occur []
+  repeat n_rounds [
+    set #_round #_round + 1
+    init-cards
+    repeat 4 [deal]
+    hands-rank
+    ask players [
+      ifelse member? (contents-of sort my_cards) dic_cards [
+        let pos position (contents-of sort my_cards) dic_cards
+        if member? self winners [
+          set #_wins replace-item pos #_wins (1 + item pos #_wins)
+        ]
+        set #_occur replace-item pos #_occur (1 + item pos #_occur)
+      ][
+        set dic_cards lput (contents-of sort my_cards) dic_cards
+        set #_wins lput (ifelse-value (member? self winners)[1][0] ) #_wins
+        set #_occur lput 1 #_occur
+      ]
+    ]
+    set winners no-turtles
+  ]
+
+  (foreach dic_cards #_wins #_occur [ [d n o] -> print (list d n o)])
+end
+
+
 
 
 
@@ -624,6 +677,7 @@ to update-player-status
   ask my_move_patch [set plabel [(word ifelse-value (my_move != 0) [my_move][""] ifelse-value (current_bet > 0) [word " " current_bet][""] )] of myself ]
   set color ifelse-value (my_move = "fold")[black][ifelse-value betted? [green][red]]
 end
+
 @#$#@#$#@
 GRAPHICS-WINDOW
 210
@@ -676,9 +730,9 @@ SLIDER
 48
 num-players
 num-players
-0
+2
 10
-10.0
+6.0
 1
 1
 NIL
@@ -825,7 +879,7 @@ INPUTBOX
 631
 623
 hand
-[[\"Spade\" 4]\n [\"Club\" 2]\n [\"Spade\" 3] \n [\"Heart\" 2] \n [\"Spade\" 2] \n [\"Diamond\" 2] \n [\"Spade\" 6]]
+[[\"Spade\" 4]\n [\"Club\" 1]\n [\"Spade\" 3] \n [\"Heart\" 2] \n [\"Spade\" 8] \n [\"Diamond\" 2] \n [\"Spade\" 12]]
 1
 1
 String
@@ -866,16 +920,46 @@ player-money
 player-money
 0
 200
-100.0
+200.0
 1
 1
 NIL
 HORIZONTAL
 
+MONITOR
+997
+453
+1063
+498
+NIL
+#_round
+17
+1
+11
+
+BUTTON
+641
+621
+887
+654
+NIL
+batch-dealing user-input \"rounds\"
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
 @#$#@#$#@
 ## WHAT IS IT?
 
 A poker simulator. Wrote it just for fun.
+
+[ Online run on github.io ](https://jihegao.github.io/poker-with-netlogo/)
 
 ## Functions 
 
