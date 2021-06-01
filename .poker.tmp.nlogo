@@ -1,3 +1,5 @@
+extensions [csv qlearningextension]
+
 breed [cards card]
 breed [players player]
 
@@ -14,6 +16,7 @@ players-own [
   my_move ; check, bet, call, raise, fold
   current_bet
   betted?
+  reward-list
 ]
 
 globals [
@@ -596,6 +599,7 @@ to batch-dealing [n_rounds]
     set winners no-turtles
   ]
 
+
   (foreach dic_cards #_wins #_occur [ [d n o] -> print (list d n o)])
 end
 
@@ -678,6 +682,96 @@ to update-player-status
   set color ifelse-value (my_move = "fold")[black][ifelse-value betted? [green][red]]
 end
 
+
+;=========
+
+
+
+to-report bla
+  report "c"
+end
+
+
+to ql-setup
+  clear-all
+
+  set-current-plot "Ave Reward Per Episode"
+  set-plot-y-range -10 10
+
+  ask patches [set pcolor grey set reward -1 set plabel reward]
+  ask patches with [pycor = 0 and pxcor > 0 and pxcor < 11][set pcolor blue set reward -100 set plabel reward]
+  ask patch 0 0 [set pcolor red + 1]
+  ask patch 11 0 [set pcolor green]
+
+  ask patch 0 0 [sprout-walkers 1[set color yellow]]
+
+  ask Walkers [
+    qlearningextension:state-def-extra ["xcor" "ycor"] [bla]
+    (qlearningextension:actions [goUp] [goDown] [goLeft] [goRight])
+    qlearningextension:reward [rewardFunc]
+    qlearningextension:end-episode [isEndState] resetEpisode
+    qlearningextension:action-selection "e-greedy" [0.5 0.08]
+    qlearningextension:learning-rate 1
+    qlearningextension:discount-factor 0.75
+
+    ; used to create the plot
+    create-temporary-plot-pen (word who)
+    set-plot-pen-color color
+    set reward-list []
+  ]
+end
+
+to ql-go
+  ask Walkers [
+    qlearningextension:learning
+    print(qlearningextension:get-qtable)
+  ]
+end
+
+to-report rewardFunc
+  report 0 ; report [reward] of patch-here
+end
+
+to check
+end
+
+
+to call
+
+end
+
+to raise
+
+end
+
+to fold
+
+end
+
+to-report isEndState
+  if [pcolor] of patch-here = blue or [pcolor] of patch-here = green [
+    report true
+  ]
+  report false
+end
+
+to resetEpisode
+  setxy 0 0
+
+  ; used to update the plot
+  let rew-sum 0
+  let length-rew 0
+  foreach reward-list [ r ->
+    set rew-sum rew-sum + r
+    set length-rew length-rew + 1
+  ]
+  let avg-rew rew-sum / length-rew
+
+  set-current-plot-pen (word who)
+  plot avg-rew
+
+  set reward-list []
+end
 @#$#@#$#@
 GRAPHICS-WINDOW
 210
@@ -874,10 +968,10 @@ NIL
 1
 
 INPUTBOX
-375
-474
-631
-623
+652
+455
+908
+604
 hand
 [[\"Spade\" 4]\n [\"Club\" 1]\n [\"Spade\" 3] \n [\"Heart\" 2] \n [\"Spade\" 8] \n [\"Diamond\" 2] \n [\"Spade\" 12]]
 1
@@ -885,10 +979,10 @@ hand
 String
 
 BUTTON
-641
-585
-826
-618
+654
+607
+839
+640
 test hand rank calculator
 show compute hh
 NIL
@@ -938,11 +1032,11 @@ NIL
 11
 
 BUTTON
-641
-621
-887
-654
-NIL
+300
+501
+485
+534
+batch-dealing-experiment
 batch-dealing user-input \"rounds\"
 NIL
 1
@@ -959,8 +1053,7 @@ NIL
 
 A poker simulator. Wrote it just for fun.
 
-Online run [!1]
-[https://jihegao.github.io/poker-with-netlogo/]
+[ Online run on github.io ](https://jihegao.github.io/poker-with-netlogo/)
 
 ## Functions 
 
@@ -1305,7 +1398,7 @@ false
 Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 @#$#@#$#@
-NetLogo 6.1.1
+NetLogo 6.2.0
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@

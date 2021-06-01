@@ -1,0 +1,154 @@
+;=========
+
+
+
+
+to check
+  add-move "check"
+end
+
+to raise
+  add-move "raise"
+  make-bet 3 * total_bet
+end
+
+to bet
+  add-move "bet"
+  make-bet total_bet
+end
+
+to call
+  add-move "call"
+  make-bet money_to_call - current_bet
+end
+
+to fold
+  add-move "fold"
+end
+
+
+
+; 1 - 3
+to-report player_seq_score
+  report round ((1 + position self [player_seq] of current_game) / num-players * 3)
+end
+
+to-report win_rate_score
+  report ifelse-value ( win_rate > 0.7 )[3][ifelse-value (win_rate > 0.4)[2][1]]
+end
+
+to-report competition_score
+  report round ((mean [length my_move] of players) / ([current_round] of current_game) * 3)
+end
+
+;; self define turtle function to report turtle's current state
+;; player_seq_score     -> 1, 2, 3 ( good, middle, bad )
+;; win_rate_score       -> 1, 2, 3 ( low, midele, high )
+;; competition_score    -> 1, 2, 3 ( competition low, middle, intense )
+to-report Si
+  report (list  win_rate_score rate_of_return_score )
+end
+
+
+to-report rate_of_return_score
+  if money_to_call = 0 [report 1]
+  report ifelse-value (pot_money / money_to_call > 3 )[3][ifelse-value (pot_money / money_to_call > 2)[2][1]]
+end
+
+;; self define turtle function to report all possible
+to-report Qlist_keys_map [state]
+  report (map [ ?1 -> (list state ?1) ] [0 1 2 3 4])
+end
+
+;; self define turtle function
+to-report Qlist
+  report map [ ?1 -> ifelse-value (table:has-key? SA ?1) [ table:get SA ?1 ] [ 0 ] ] Qlist_keys_map Si
+end
+
+
+
+to ql-setup
+  set r-episode 0
+  set Alist
+  (list
+    ([ [] -> check ])
+    ([ [] -> bet ])
+    ([ [] -> raise ])
+    ([ [] -> call ])
+    ([ [] -> fold ])
+  )
+
+  set global-SA table:make
+
+end
+
+
+to rl-learn
+  ;set episode 1
+  repeat num-episodes [
+    tick
+    game-episode  
+    ;print (word "--------episode " episode)
+    ;set episode episode + 1
+    
+    set ave-reward r-episode / ticks
+    set-current-plot "Ave Reward Per Episode"
+    plot ave-reward
+  ]
+end
+
+
+to game-episode 
+  play-one-round
+end
+
+
+to rl-action
+  ;--from current state find maximun action
+  ;let Qnew max Qlist ;--find the max value of Qsa from this patch
+  set Qnew 1
+  let Qmax 0
+  set a_index random length Alist  ;; position of Action in Action_list
+
+  ifelse random-float 1 <= exploration-%
+  [
+    set Action one-of Alist          ;--pick random direction
+    set a_index position Action Alist
+    ;set Qmax max Qlist              ;--get max from the Qlist values of the current Ai
+    set Qnew item a_index Qlist     ;--find the value in Qlist with the same position as in the Hlist
+  ]
+  [
+    if Qnew != Qmax
+    [
+      set Qmax max Qlist ;--get max from the Qlist values of the current Ai
+      set a_index position Qmax Qlist
+      set ACTION item a_index Alist
+      set Qnew Qmax ;--find the value in Qlist with the same position as in the Hlist
+    ]
+  ]
+  set S_i-1 Si
+  run ACTION  ;; turtle move
+end
+
+
+to rl-reward
+  let r myReward
+  set r-episode r-episode + r
+
+  ;-- Q-learning update function --
+  let flist filter [? -> table:has-key? SA ? ] (Qlist_keys_map Si)
+  let QQnew 0
+  if length flist > 0 [ set QQnew max map [? -> table:get SA ? ] flist ]
+
+  set Qnew Qnew + 0.1 * (r + discount * QQnew - Qnew) ;--perform Q-Learning
+  set Qnew precision Qnew 4
+  ; update SA
+  table:put SA (list S_i-1 a_index) Qnew    
+end
+
+
+to-report myReward
+  report money - player-money
+end
+
+
