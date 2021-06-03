@@ -1,4 +1,4 @@
-extensions [csv table shell py]
+extensions [csv table shell py profiler]
 
 __includes ["rl.nls"]
 
@@ -79,7 +79,8 @@ to setup
   init-players
 
   if last (csv:from-string shell:pwd "/") != "calculator" [
-    shell:cd "/Users/gaojihe/文档/TurtleLab/poker/calculator"
+    shell:cd "calculator"
+    ;shell:cd "/Users/gaojihe/文档/TurtleLab/poker/calculator"
   ]
   ql-setup
 end
@@ -184,6 +185,8 @@ to init-new-game
 end
 
 to play-one-round
+  if profiler? [profiler:start]
+
   init-new-game
   ask current_game [
     deal ;"pre-flop"
@@ -197,6 +200,12 @@ to play-one-round
     winner-collect-the-money
     record-game
     if learn? [ ask players [rl-reward] ]
+  ]
+
+  if profiler? [
+    profiler:stop          ;; stop profiling
+    print profiler:report  ;; view the results
+    profiler:reset         ;; clear the data
   ]
 end
 
@@ -609,24 +618,29 @@ end
 
 
 to update-my-cards-score
-  ; use python deuces
-  py:run (word "board = "
-                   "[ Card.new('" card_conv_to_str item 0 [community_cards] of current_game "'),"
-                   "  Card.new('" card_conv_to_str item 1 [community_cards] of current_game "'),"
-                   "  Card.new('" card_conv_to_str item 2 [community_cards] of current_game "'),"
-                   "  Card.new('" card_conv_to_str item 3 [community_cards] of current_game "'),"
-                   "  Card.new('" card_conv_to_str item 4 [community_cards] of current_game "')]"
-  )
-  py:run (word "hand = "
-                   "[ Card.new('" card_conv_to_str item 0 my_cards "'),"
-                   "  Card.new('" card_conv_to_str item 1 my_cards "') ]"
-  )
+  ifelse use-deuces?
+  [
+    ; use python deuces
+    py:run (word "board = "
+                     "[ Card.new('" card_conv_to_str item 0 [community_cards] of current_game "'),"
+                     "  Card.new('" card_conv_to_str item 1 [community_cards] of current_game "'),"
+                     "  Card.new('" card_conv_to_str item 2 [community_cards] of current_game "'),"
+                     "  Card.new('" card_conv_to_str item 3 [community_cards] of current_game "'),"
+                     "  Card.new('" card_conv_to_str item 4 [community_cards] of current_game "')]"
+    )
+    py:run (word "hand = "
+                     "[ Card.new('" card_conv_to_str item 0 my_cards "'),"
+                     "  Card.new('" card_conv_to_str item 1 my_cards "') ]"
+    )
 
-  set my_cards_score ifelse-value (fold?)[0][py:runresult "Evaluator().evaluate(board, hand)"]
+    set my_cards_score ifelse-value (fold?)[0][py:runresult "Evaluator().evaluate(board, hand)"]
+  ]
+  [
+    ; use internal ranking algorithm
+    set my_cards_score ifelse-value (fold?)[0][compute-player-cards self]
+  ]
+
   if (not fold? and print-logs?) [show my_cards_score]
-
-  ; use internal ranking algorithm
-  ; set my_cards_score ifelse-value (fold?)[0][compute-player-cards self]
 end
 
 
@@ -770,22 +784,30 @@ to-report card_conv_to_str [c]
 end
 
 to-report win_rate
-  if length [community_cards] of current_game < 3 [
+  ifelse length [community_cards] of current_game < 3 [
     report 0.1
+  ][
+
+    ifelse useCalculator?  ; use historical data or use PokerCalcMain.py
+    [
+
+      let calc_result 0
+      let b1 card_conv_to_str item 0 [community_cards] of current_game
+      let b2 card_conv_to_str item 1 [community_cards] of current_game
+      let b3 card_conv_to_str item 2 [community_cards] of current_game
+      let h1 card_conv_to_str item 0 my_cards
+      let h2 card_conv_to_str item 1 my_cards
+      carefully [
+        set calc_result (shell:exec "python3" "PokerCalcMain.py" "--board" b1 b2 b3 "--hand" h1 h2)
+      ]
+      [print "ERROR card"]
+      report last last csv:from-string calc_result
+    ]
+    [
+      report 0
+    ]
   ]
 
-  let calc_result 0
-  let b1 card_conv_to_str item 0 [community_cards] of current_game
-  let b2 card_conv_to_str item 1 [community_cards] of current_game
-  let b3 card_conv_to_str item 2 [community_cards] of current_game
-  let h1 card_conv_to_str item 0 my_cards
-  let h2 card_conv_to_str item 1 my_cards
-  carefully [
-    set calc_result (shell:exec "python3" "PokerCalcMain.py" "--board" b1 b2 b3 "--hand" h1 h2)
-  ]
-  [print "ERROR card"]
-
-  report last last csv:from-string calc_result
 end
 
 
@@ -1008,7 +1030,7 @@ SWITCH
 625
 print-logs?
 print-logs?
-0
+1
 1
 -1000
 
@@ -1374,6 +1396,39 @@ NIL
 NIL
 NIL
 1
+
+SWITCH
+266
+632
+401
+665
+use-deuces?
+use-deuces?
+1
+1
+-1000
+
+SWITCH
+137
+674
+246
+707
+profiler?
+profiler?
+1
+1
+-1000
+
+SWITCH
+298
+684
+446
+717
+useCalculator?
+useCalculator?
+0
+1
+-1000
 
 @#$#@#$#@
 ## WHAT IS IT?
