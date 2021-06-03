@@ -2,8 +2,6 @@
 
 A poker simulator. Wrote it just for fun.
 
-[ Online run on github.io ](https://jihegao.github.io/poker-with-netlogo/)
-
 ## Functions 
 
 - deal the cards with pre-flop, flop, turn, river round
@@ -13,9 +11,4 @@ A poker simulator. Wrote it just for fun.
 ## todo
 
 - All-in (and allocate the pot money)
-- winning rate estimation function
 - players strategy
-
-## Contact
-
-jihe.gao(at)gmail.com
